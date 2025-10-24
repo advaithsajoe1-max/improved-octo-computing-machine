@@ -35,21 +35,26 @@
     Click anywhere on the map to add a marker.
   </p>
 
-  <script>
-    // ✅ Firebase Configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyA4O-rw0WsoqF4Q8WcJhKyMsD5NwGmNOG8",
-      authDomain: "urban-renew-map.firebaseapp.com",
-      databaseURL: "https://urban-renew-map-default-rtdb.asia-southeast1.firebasedatabase.app/",
-      projectId: "urban-renew-map",
-      storageBucket: "urban-renew-map.appspot.com",
-      messagingSenderId: "373727729087",
-      appId: "1:373727729087:web:db1f5b85b246e37b1b6d41"
-    };
+<!-- Firebase App & Database (non-module, global object) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js"></script>
 
-    // ✅ Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyBeKqCApxnkuhP8XMGQNh_3s6a85QdTWBU",
+    authDomain: "mapping-system-7e62f.firebaseapp.com",
+    databaseURL: "https://mapping-system-7e62f-default-rtdb.firebaseio.com",
+    projectId: "mapping-system-7e62f",
+    storageBucket: "mapping-system-7e62f.appspot.com",
+    messagingSenderId: "466910563569",
+    appId: "1:466910563569:web:4736a59508f09630f92d50"
+  };
+
+  // Initialize Firebase
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database(); // ✅ global firebase object available
+</script>
 
     // ✅ Initialize Leaflet Map
     const map = L.map('map').setView([10.0, 76.0], 10);
