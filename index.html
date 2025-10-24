@@ -106,13 +106,15 @@ html, body { height: 100%; margin: 0; padding: 0; }
     </div>
 </div>
 
-<!-- Firebase + Map Script -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.3/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.0.3/firebase-firestore.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.3/firebase-auth.js";
 
 const EDITOR_PASSWORD = "edit";
+    
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.3/firebase-app.js';
+  import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, setLogLevel } from 'https://www.gstatic.com/firebasejs/11.0.3/firebase-firestore.js';
+  import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.0.3/firebase-auth.js';
+</script>
 
 const firebaseConfig = {
     apiKey: "AIzaSyBeKqCApxnkuhP8XMGQNh_3s6a85QdTWBU",
