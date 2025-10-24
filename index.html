@@ -1,113 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Collaborative Mapping System</title>
-
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS for styling -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Leaflet CSS & JS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js"></script>
-
-  <style>
-    #map {
-      height: 90vh;
-      width: 100%;
-    }
-  </style>
 </head>
-<body class="bg-gray-900 text-white flex flex-col items-center">
-  <h1 class="text-3xl font-bold my-4">🌍 Collaborative Mapping System</h1>
+<body>
+  <h1 class="text-2xl font-bold text-center mt-6">Firebase Modular Example</h1>
 
-  <div id="map" class="rounded-2xl shadow-lg"></div>
+  <script type="module">
+    // Modular imports from Firebase v10
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+    import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
 
-  <p class="mt-4 text-gray-400">
-    Click anywhere on the map to add a marker.
-  </p>
-
-<!-- Firebase App & Database (non-module, global object) -->
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js"></script>
-
-<script>
-  // Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyBeKqCApxnkuhP8XMGQNh_3s6a85QdTWBU",
-    authDomain: "mapping-system-7e62f.firebaseapp.com",
-    databaseURL: "https://mapping-system-7e62f-default-rtdb.firebaseio.com",
-    projectId: "mapping-system-7e62f",
-    storageBucket: "mapping-system-7e62f.appspot.com",
-    messagingSenderId: "466910563569",
-    appId: "1:466910563569:web:4736a59508f09630f92d50"
-  };
-
-  // Initialize Firebase
-  const app = firebase.initializeApp(firebaseConfig);
-  const db = firebase.database(); // ✅ global firebase object available
-</script>
-
-    // ✅ Initialize Leaflet Map
-    const map = L.map('map').setView([10.0, 76.0], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // ✅ Load existing markers
-    const markers = {};
-
-    db.ref("places").on("value", (snapshot) => {
-      const data = snapshot.val();
-      // Remove old markers
-      Object.values(markers).forEach(marker => map.removeLayer(marker));
-      Object.keys(markers).forEach(k => delete markers[k]);
-
-      if (data) {
-        Object.entries(data).forEach(([id, place]) => {
-          const marker = L.marker([place.lat, place.lng]).addTo(map);
-          marker.bindPopup(
-            `<b>${place.name}</b><br>${place.description || ''}<br><button onclick="deletePin('${id}')">🗑 Delete</button>`
-          );
-          markers[id] = marker;
-        });
-      }
-    });
-
-    // ✅ Add new marker
-    map.on("click", (e) => {
-      const name = prompt("Enter a name for this location:");
-      if (!name) return;
-      const description = prompt("Enter a short description:");
-      const newPin = {
-        lat: e.latlng.lat,
-        lng: e.latlng.lng,
-        name,
-        description,
-      };
-      db.ref("places").push(newPin);
-    });
-
-    // ✅ Delete marker (with password)
-    window.deletePin = function (id) {
-      const pwd = prompt("Enter password to delete:");
-      if (pwd === "AT@chat/gpt") {
-        db.ref("places/" + id).remove();
-        alert("Deleted successfully.");
-      } else {
-        alert("Wrong password!");
-      }
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBeKqCApxnkuhP8XMGQNh_3s6a85QdTWBU",
+      authDomain: "mapping-system-7e62f.firebaseapp.com",
+      databaseURL: "https://mapping-system-7e62f-default-rtdb.firebaseio.com",
+      projectId: "mapping-system-7e62f",
+      storageBucket: "mapping-system-7e62f.appspot.com",
+      messagingSenderId: "466910563569",
+      appId: "1:466910563569:web:4736a59508f09630f92d50"
     };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Example: write data to Firebase Realtime Database
+    async function writeTestData() {
+      try {
+        await set(ref(db, 'test/path'), {
+          message: "Hello Firebase v10 modular!"
+        });
+        console.log("Data written successfully!");
+      } catch (error) {
+        console.error("Error writing data:", error);
+      }
+    }
+
+    // Example: read data from Firebase Realtime Database
+    async function readTestData() {
+      try {
+        const snapshot = await get(child(ref(db), 'test/path'));
+        if (snapshot.exists()) {
+          console.log("Data read from database:", snapshot.val());
+        } else {
+          console.log("No data found at test/path");
+        }
+      } catch (error) {
+        console.error("Error reading data:", error);
+      }
+    }
+
+    // Run examples
+    writeTestData();
+    readTestData();
   </script>
 </body>
 </html>
-
-
