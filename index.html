@@ -8,151 +8,101 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Leaflet.js -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet CSS & JS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Firebase (Compat SDKs - work on GitHub Pages) -->
-  <script src="https://www.gstatic.com/firebasejs/11.0.3/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.0.3/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.0.3/firebase-auth-compat.js"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js"></script>
+
+  <style>
+    #map {
+      height: 90vh;
+      width: 100%;
+    }
+  </style>
 </head>
+<body class="bg-gray-900 text-white flex flex-col items-center">
+  <h1 class="text-3xl font-bold my-4">🌍 Collaborative Mapping System</h1>
 
-<body class="bg-gray-100 h-screen flex flex-col">
-  <h1 class="text-3xl font-bold text-center p-4 bg-blue-600 text-white">
-    Collaborative Mapping System
-  </h1>
+  <div id="map" class="rounded-2xl shadow-lg"></div>
 
-  <!-- Map container -->
-  <div id="map" class="flex-1"></div>
-
-  <!-- Confirm modal -->
-  <div id="confirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-    <div class="bg-white rounded-lg shadow-lg p-6 w-80 text-center">
-      <h2 class="text-xl font-semibold mb-4">Enter details</h2>
-      <input id="nameInput" class="border border-gray-300 rounded w-full mb-3 p-2" type="text" placeholder="Place name" />
-      <textarea id="descInput" class="border border-gray-300 rounded w-full mb-3 p-2" placeholder="Description"></textarea>
-      <button id="confirmBtn" class="bg-blue-600 text-white px-4 py-2 rounded mr-2">Confirm</button>
-      <button id="cancelBtn" class="bg-gray-400 text-white px-4 py-2 rounded">Cancel</button>
-    </div>
-  </div>
-
-  <!-- Delete modal -->
-  <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-    <div class="bg-white rounded-lg shadow-lg p-6 w-80 text-center">
-      <h2 class="text-xl font-semibold mb-4">Enter password to delete</h2>
-      <input id="deletePassword" class="border border-gray-300 rounded w-full mb-3 p-2" type="password" placeholder="Password" />
-      <button id="deleteConfirmBtn" class="bg-red-600 text-white px-4 py-2 rounded mr-2">Delete</button>
-      <button id="deleteCancelBtn" class="bg-gray-400 text-white px-4 py-2 rounded">Cancel</button>
-    </div>
-  </div>
+  <p class="mt-4 text-gray-400">
+    Click anywhere on the map to add a marker.
+  </p>
 
   <script>
-    // ✅ Firebase Config
+    // ✅ Firebase Configuration
     const firebaseConfig = {
-      apiKey: "AIzaSyA6XUf0-3vnYBO1xEKH6K2B00aAd2JdvHI",
+      apiKey: "AIzaSyA4O-rw0WsoqF4Q8WcJhKyMsD5NwGmNOG8",
       authDomain: "urban-renew-map.firebaseapp.com",
-      databaseURL: "https://urban-renew-map-default-rtdb.asia-southeast1.firebasedatabase.app",
+      databaseURL: "https://urban-renew-map-default-rtdb.asia-southeast1.firebasedatabase.app/",
       projectId: "urban-renew-map",
       storageBucket: "urban-renew-map.appspot.com",
-      messagingSenderId: "919417084225",
-      appId: "1:919417084225:web:7e4d67a49f9131cda4b357"
+      messagingSenderId: "373727729087",
+      appId: "1:373727729087:web:db1f5b85b246e37b1b6d41"
     };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+    // ✅ Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    // Sign in anonymously (for writing pins)
-    auth.signInAnonymously().catch(console.error);
-
-    // ✅ Initialize map
-    const map = L.map("map").setView([10.8505, 76.2711], 8);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap contributors"
+    // ✅ Initialize Leaflet Map
+    const map = L.map('map').setView([10.0, 76.0], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Globals
-    let tempMarker = null;
-    let selectedMarkerId = null;
+    // ✅ Load existing markers
     const markers = {};
 
-    // Add marker on map click
-    map.on("click", (e) => {
-      const { lat, lng } = e.latlng;
-      tempMarker = L.marker([lat, lng]).addTo(map);
-      document.getElementById("confirmModal").classList.remove("hidden");
-    });
+    db.ref("places").on("value", (snapshot) => {
+      const data = snapshot.val();
+      // Remove old markers
+      Object.values(markers).forEach(marker => map.removeLayer(marker));
+      Object.keys(markers).forEach(k => delete markers[k]);
 
-    // Confirm add
-    document.getElementById("confirmBtn").addEventListener("click", async () => {
-      const name = document.getElementById("nameInput").value.trim();
-      const desc = document.getElementById("descInput").value.trim();
-
-      if (name && desc && tempMarker) {
-        const { lat, lng } = tempMarker.getLatLng();
-        await db.collection("places").add({ name, desc, lat, lng });
-        map.removeLayer(tempMarker);
-        tempMarker = null;
-        document.getElementById("confirmModal").classList.add("hidden");
-        document.getElementById("nameInput").value = "";
-        document.getElementById("descInput").value = "";
-      } else {
-        alert("Please fill all fields.");
-      }
-    });
-
-    // Cancel add
-    document.getElementById("cancelBtn").addEventListener("click", () => {
-      if (tempMarker) map.removeLayer(tempMarker);
-      tempMarker = null;
-      document.getElementById("confirmModal").classList.add("hidden");
-    });
-
-    // ✅ Live load pins for all users
-    db.collection("places").onSnapshot((snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        const data = change.doc.data();
-        const id = change.doc.id;
-
-        if (change.type === "added" && !markers[id]) {
-          const marker = L.marker([data.lat, data.lng]).addTo(map);
+      if (data) {
+        Object.entries(data).forEach(([id, place]) => {
+          const marker = L.marker([place.lat, place.lng]).addTo(map);
           marker.bindPopup(
-            `<b>${data.name}</b><br>${data.desc}<br><button onclick="openDeleteModal('${id}')">🗑 Delete</button>`
+            `<b>${place.name}</b><br>${place.description || ''}<br><button onclick="deletePin('${id}')">🗑 Delete</button>`
           );
           markers[id] = marker;
-        }
-
-        if (change.type === "removed" && markers[id]) {
-          map.removeLayer(markers[id]);
-          delete markers[id];
-        }
-      });
-    });
-
-    // ✅ Delete modal handling
-    window.openDeleteModal = function (id) {
-      selectedMarkerId = id;
-      document.getElementById("deleteModal").classList.remove("hidden");
-    };
-
-    document.getElementById("deleteConfirmBtn").addEventListener("click", async () => {
-      const password = document.getElementById("deletePassword").value;
-      if (password === "AT@chat/gpt" && selectedMarkerId) {
-        await db.collection("places").doc(selectedMarkerId).delete();
-        document.getElementById("deleteModal").classList.add("hidden");
-        document.getElementById("deletePassword").value = "";
-      } else {
-        alert("Incorrect password!");
+        });
       }
     });
 
-    document.getElementById("deleteCancelBtn").addEventListener("click", () => {
-      document.getElementById("deleteModal").classList.add("hidden");
-      document.getElementById("deletePassword").value = "";
+    // ✅ Add new marker
+    map.on("click", (e) => {
+      const name = prompt("Enter a name for this location:");
+      if (!name) return;
+      const description = prompt("Enter a short description:");
+      const newPin = {
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+        name,
+        description,
+      };
+      db.ref("places").push(newPin);
     });
+
+    // ✅ Delete marker (with password)
+    window.deletePin = function (id) {
+      const pwd = prompt("Enter password to delete:");
+      if (pwd === "AT@chat/gpt") {
+        db.ref("places/" + id).remove();
+        alert("Deleted successfully.");
+      } else {
+        alert("Wrong password!");
+      }
+    };
   </script>
 </body>
 </html>
+
 
