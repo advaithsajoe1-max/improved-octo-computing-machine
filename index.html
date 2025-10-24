@@ -4,18 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Collaborative Mapping System</title>
-  <!-- Tailwind CSS for styling -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-sA+e2rT9Jz/1ioH1cDURcD/TZlkhp0iKz0NnvS5Z4hY="
+    crossorigin=""
+  />
+  <style>
+    #map { height: 80vh; width: 100%; margin-top: 1rem; }
+  </style>
 </head>
-<body>
-  <h1 class="text-2xl font-bold text-center mt-6">Firebase Modular Example</h1>
+<body class="bg-gray-100">
+  <h1 class="text-3xl font-bold text-center mt-4">Collaborative Mapping System</h1>
+  <div id="map"></div>
 
   <script type="module">
-    // Modular imports from Firebase v10
+    // --- Firebase modular imports ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-    import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
 
-    // Firebase config
+    // --- Firebase config ---
     const firebaseConfig = {
       apiKey: "AIzaSyBeKqCApxnkuhP8XMGQNh_3s6a85QdTWBU",
       authDomain: "mapping-system-7e62f.firebaseapp.com",
@@ -26,39 +37,53 @@
       appId: "1:466910563569:web:4736a59508f09630f92d50"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const pinsRef = ref(db, 'pins');
 
-    // Example: write data to Firebase Realtime Database
-    async function writeTestData() {
-      try {
-        await set(ref(db, 'test/path'), {
-          message: "Hello Firebase v10 modular!"
-        });
-        console.log("Data written successfully!");
-      } catch (error) {
-        console.error("Error writing data:", error);
-      }
-    }
+    // --- Initialize Leaflet Map ---
+    const map = L.map('map').setView([20.5937, 78.9629], 5); // center of India
 
-    // Example: read data from Firebase Realtime Database
-    async function readTestData() {
-      try {
-        const snapshot = await get(child(ref(db), 'test/path'));
-        if (snapshot.exists()) {
-          console.log("Data read from database:", snapshot.val());
-        } else {
-          console.log("No data found at test/path");
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // --- Add existing pins from Firebase in real-time ---
+    onValue(pinsRef, (snapshot) => {
+      map.eachLayer((layer) => {
+        if (layer.options && layer.options.pane === 'markerPane') {
+          map.removeLayer(layer); // remove old markers
         }
-      } catch (error) {
-        console.error("Error reading data:", error);
-      }
-    }
+      });
 
-    // Run examples
-    writeTestData();
-    readTestData();
+      snapshot.forEach((childSnap) => {
+        const data = childSnap.val();
+        L.marker([data.lat, data.lng])
+          .addTo(map)
+          .bindPopup(data.label || "No label");
+      });
+    });
+
+    // --- Add pin on map click ---
+    map.on('click', (e) => {
+      const label = prompt("Enter a label for this pin:");
+      if (!label) return;
+
+      // push to Firebase
+      push(pinsRef, {
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+        label: label
+      });
+    });
+
   </script>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-o9N1j6kM6V3ZqXipmHJNc6oZKD9Yz1hK/2ZCjVxvLVY="
+    crossorigin=""
+  ></script>
 </body>
 </html>
