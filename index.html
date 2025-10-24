@@ -112,9 +112,10 @@ html, body { height: 100%; margin: 0; padding: 0; }
 <script type="module">
 const EDITOR_PASSWORD = "edit"; // <-- editor password first
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.26.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.26.0/firebase-firestore.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.26.0/firebase-auth.js";
+import { initializeApp } from 'https://cdnjs.cloudflare.com/ajax/libs/firebase/12.1.0/firebase-app.js';
+import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, setLogLevel } from 'https://cdnjs.cloudflare.com/ajax/libs/firebase/12.1.0/firebase-firestore.js';
+import { getAuth, signInAnonymously } from 'https://cdnjs.cloudflare.com/ajax/libs/firebase/12.1.0/firebase-auth.js';
+
 
 
 const firebaseConfig = {
