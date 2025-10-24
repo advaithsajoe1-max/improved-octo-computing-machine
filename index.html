@@ -85,19 +85,37 @@ html, body { height: 100%; margin: 0; padding: 0; }
         </div>
     </div>
 
-    <!-- Alert & Confirm Modals omitted for brevity (same as before) -->
+    <!-- Alert Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-sm transform transition-all scale-95 opacity-0" id="alert-modal-content">
+            <p id="alert-message" class="text-center text-gray-800 mb-6"></p>
+            <div class="flex justify-center">
+                <button id="ok-alert-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">OK</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-sm transform transition-all scale-95 opacity-0" id="confirm-modal-content">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Are you sure?</h3>
+            <p id="confirm-message" class="text-gray-700 mb-6"></p>
+            <div class="flex items-center justify-end gap-3">
+                <button id="cancel-confirm-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">Cancel</button>
+                <button id="confirm-action-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Confirm</button>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Firebase Realtime Database -->
+<!-- Firebase + Map JS -->
 <script type="module">
-const EDITOR_PASSWORD = "edit"; // password first
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
 import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
 
-// Firebase config
+const EDITOR_PASSWORD = "edit";
+
 const firebaseConfig = {
     apiKey: "AIzaSyBeKqCApxnkuhP8XMGQNh_3s6a85QdTWBU",
     authDomain: "mapping-system-7e62f.firebaseapp.com",
@@ -112,33 +130,40 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-let map, isEditorMode = false, currentLatLng = null, markersOnMap = {};
+let map, isEditorMode = false, currentLatLng = null, markersOnMap = {}, confirmAction = null;
 
-// --- Map Setup ---
+// --- Map Setup with boundaries ---
 function initMap() {
-    map = L.map('map').setView([20,0],2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const southWest = L.latLng(-85, -180);
+    const northEast = L.latLng(85, 180);
+    const bounds = L.latLngBounds(southWest, northEast);
+
+    map = L.map('map', { maxBounds: bounds, maxBoundsViscosity: 1.0 }).setView([20,0],2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
+
     map.on('click', onMapClick);
 }
 
-// --- Listen for Markers ---
+// --- Firebase listener ---
 function listenForMarkers() {
-    const markersRef = ref(db, 'markers');
+    const markersRef = ref(db,'markers');
     onValue(markersRef, snapshot => {
         Object.values(markersOnMap).forEach(m => m.remove());
         markersOnMap = {};
-        snapshot.forEach(childSnap => {
-            const data = childSnap.val();
-            addMarkerToMap(data, childSnap.key);
+        snapshot.forEach(child => {
+            const data = child.val();
+            if(data.lat && data.lng){
+                addMarkerToMap(data, child.key);
+            }
         });
     });
 }
 
-// --- Add Marker ---
-function addMarkerToMap(data, id) {
+// --- Add marker to map ---
+function addMarkerToMap(data, id){
     const marker = L.marker([data.lat, data.lng]).addTo(map);
     let popup = `<div class="p-2"><h3 class="font-bold text-lg mb-1">${escapeHTML(data.name)}</h3><p>${escapeHTML(data.description)}</p>`;
     if(isEditorMode) popup += `<button data-id="${id}" class="delete-btn mt-3 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full">Delete</button>`;
@@ -148,58 +173,56 @@ function addMarkerToMap(data, id) {
     markersOnMap[id] = marker;
 }
 
-// --- Event Handlers ---
-function onMapClick(e) {
-    if(isEditorMode) {
+// --- Event handlers ---
+function onMapClick(e){
+    if(isEditorMode){
         currentLatLng = e.latlng;
         document.getElementById('pin-form').reset();
         showModal('pin-modal');
     }
 }
 
+// --- Escape HTML ---
 function escapeHTML(str){
     const p = document.createElement('p');
     p.textContent = str;
     return p.innerHTML;
 }
 
-// --- Init ---
-async function main(){
-    try { await signInAnonymously(auth); } 
-    catch(e){ console.error(e); alert("Firebase auth failed"); }
-
-    initMap();
-    listenForMarkers();
-
-    document.getElementById('editor-mode-btn').addEventListener('click', toggleEditorMode);
-    document.getElementById('pin-form').addEventListener('submit', handlePinFormSubmit);
-    document.getElementById('cancel-pin-btn').addEventListener('click', ()=>hideModal('pin-modal'));
-    document.getElementById('map').addEventListener('click', handleDeleteClick);
-    document.getElementById('search-form').addEventListener('submit', handleSearchSubmit);
-    L.DomEvent.on(document.getElementById('search-form'),'click',L.DomEvent.stopPropagation);
-
-    document.getElementById('password-form').addEventListener('submit', handlePasswordSubmit);
-    document.getElementById('cancel-password-btn').addEventListener('click', ()=>hideModal('password-modal'));
+// --- Modals ---
+function showModal(id){
+    const modal = document.getElementById(id);
+    const content = document.getElementById(`${id}-content`);
+    modal.classList.remove('hidden');
+    setTimeout(()=>content.classList.remove('scale-95','opacity-0'),10);
+}
+function hideModal(id){
+    const modal = document.getElementById(id);
+    const content = document.getElementById(`${id}-content`);
+    content.classList.add('scale-95','opacity-0');
+    setTimeout(()=>modal.classList.add('hidden'),200);
 }
 
-main();
-
-// --- Editor & Pins ---
+// --- Editor Mode ---
 function toggleEditorMode(){
-    if(isEditorMode){ isEditorMode=false; updateUIAfterModeChange(); return; }
+    if(isEditorMode){
+        isEditorMode=false;
+        updateUIAfterModeChange();
+        return;
+    }
     document.getElementById('password-input').value='';
     showModal('password-modal');
 }
-
 function handlePasswordSubmit(e){
     e.preventDefault();
     const password = document.getElementById('password-input').value;
     hideModal('password-modal');
     if(password === EDITOR_PASSWORD){ 
-        isEditorMode=true; alert('Editor mode activated.'); updateUIAfterModeChange();
-    } else if(password) alert('Incorrect password.');
+        isEditorMode=true;
+        showAlert('Editor mode activated.');
+        updateUIAfterModeChange();
+    } else if(password) showAlert('Incorrect password.');
 }
-
 function updateUIAfterModeChange(){
     const status = document.getElementById('editor-status');
     const btn = document.getElementById('editor-mode-btn');
@@ -216,10 +239,11 @@ function updateUIAfterModeChange(){
     listenForMarkers();
 }
 
+// --- Pin Form ---
 async function handlePinFormSubmit(e){
     e.preventDefault();
     if(!currentLatLng) return;
-    const markersRef = ref(db, 'markers');
+    const markersRef = ref(db,'markers');
     const newMarkerRef = push(markersRef);
     await newMarkerRef.set({
         lat: currentLatLng.lat,
@@ -230,15 +254,17 @@ async function handlePinFormSubmit(e){
     hideModal('pin-modal');
 }
 
+// --- Delete marker ---
 function handleDeleteClick(e){
     if(e.target.classList.contains('delete-btn')){
         const id = e.target.dataset.id;
-        if(confirm('Are you sure you want to delete this pin?')){
-            remove(ref(db, 'markers/'+id)).catch(e=>console.error(e));
-        }
+        showConfirm('Are you sure you want to delete this pin?', ()=>{
+            remove(ref(db,'markers/'+id)).catch(err=>console.error(err));
+        });
     }
 }
 
+// --- Search ---
 async function handleSearchSubmit(e){
     e.preventDefault();
     const query = document.getElementById('search-input').value;
@@ -250,23 +276,47 @@ async function handleSearchSubmit(e){
             const [lat,lon] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
             map.flyTo([lat,lon],13);
             L.popup().setLatLng([lat,lon]).setContent(`<b>Search Result:</b><br>${escapeHTML(data[0].display_name)}`).openOn(map);
-        } else alert('Location not found');
-    } catch(e){ console.error(e); alert('Search failed'); }
+        } else showAlert('Location not found');
+    } catch(e){ console.error(e); showAlert('Search failed'); }
 }
 
-// --- Modals ---
-function showModal(id){
-    const modal = document.getElementById(id);
-    const content = document.getElementById(`${id}-content`);
-    modal.classList.remove('hidden');
-    setTimeout(()=>content.classList.remove('scale-95','opacity-0'),10);
+// --- Alert & Confirm ---
+function showAlert(msg){
+    document.getElementById('alert-message').textContent = msg;
+    showModal('alert-modal');
 }
-function hideModal(id){
-    const modal = document.getElementById(id);
-    const content = document.getElementById(`${id}-content`);
-    content.classList.add('scale-95','opacity-0');
-    setTimeout(()=>modal.classList.add('hidden'),200);
+function showConfirm(msg, action){
+    document.getElementById('confirm-message').textContent = msg;
+    confirmAction = action;
+    showModal('confirm-modal');
 }
+
+// --- Init ---
+async function main(){
+    try { await signInAnonymously(auth); } 
+    catch(e){ console.error(e); alert("Firebase auth failed"); }
+
+    initMap();
+    listenForMarkers();
+
+    document.getElementById('editor-mode-btn').addEventListener('click', toggleEditorMode);
+    document.getElementById('pin-form').addEventListener('submit', handlePinFormSubmit);
+    document.getElementById('cancel-pin-btn').addEventListener('click', ()=>hideModal('pin-modal'));
+    document.getElementById('map').addEventListener('click', handleDeleteClick);
+    document.getElementById('search-form').addEventListener('submit', handleSearchSubmit);
+
+    document.getElementById('password-form').addEventListener('submit', handlePasswordSubmit);
+    document.getElementById('cancel-password-btn').addEventListener('click', ()=>hideModal('password-modal'));
+    document.getElementById('ok-alert-btn').addEventListener('click', ()=>hideModal('alert-modal'));
+    document.getElementById('cancel-confirm-btn').addEventListener('click', ()=>hideModal('confirm-modal'));
+    document.getElementById('confirm-action-btn').addEventListener('click', ()=>{
+        if(typeof confirmAction==='function') confirmAction();
+        confirmAction=null;
+        hideModal('confirm-modal');
+    });
+}
+
+main();
 </script>
 </body>
 </html>
