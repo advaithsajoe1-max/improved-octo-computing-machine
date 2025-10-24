@@ -15,16 +15,20 @@
   />
   <style>
     #map { height: 80vh; width: 100%; margin-top: 1rem; }
+    .leaflet-container { background: #f3f4f6; }
   </style>
 </head>
 <body class="bg-gray-100">
   <h1 class="text-3xl font-bold text-center mt-4">Collaborative Mapping System</h1>
+  <div class="text-center mt-2">
+    <button id="confirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Confirm Pins</button>
+  </div>
   <div id="map"></div>
 
   <script type="module">
     // --- Firebase modular imports ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
+    import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
 
     // --- Firebase config ---
     const firebaseConfig = {
@@ -43,38 +47,52 @@
 
     // --- Initialize Leaflet Map ---
     const map = L.map('map').setView([20.5937, 78.9629], 5); // center of India
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // --- Add existing pins from Firebase in real-time ---
-    onValue(pinsRef, (snapshot) => {
-      map.eachLayer((layer) => {
-        if (layer.options && layer.options.pane === 'markerPane') {
-          map.removeLayer(layer); // remove old markers
-        }
-      });
+    // --- Store Leaflet markers in memory ---
+    const markers = {};
 
-      snapshot.forEach((childSnap) => {
+    // --- Load and listen for pins in real-time ---
+    onValue(pinsRef, (snapshot) => {
+      // Remove old markers from map
+      Object.values(markers).forEach(marker => map.removeLayer(marker));
+      Object.keys(markers).forEach(key => delete markers[key]);
+
+      // Add markers from database
+      snapshot.forEach(childSnap => {
         const data = childSnap.val();
-        L.marker([data.lat, data.lng])
-          .addTo(map)
-          .bindPopup(data.label || "No label");
+        const id = childSnap.key;
+        const marker = L.marker([data.lat, data.lng])
+                        .addTo(map)
+                        .bindPopup(data.label || "No label");
+        markers[id] = marker;
       });
     });
 
-    // --- Add pin on map click ---
+    // --- Add new pin on map click ---
     map.on('click', (e) => {
       const label = prompt("Enter a label for this pin:");
       if (!label) return;
 
-      // push to Firebase
+      // Save to Firebase
       push(pinsRef, {
         lat: e.latlng.lat,
         lng: e.latlng.lng,
-        label: label
+        label: label,
+        confirmed: false
       });
+    });
+
+    // --- Confirm all pins feature ---
+    const confirmBtn = document.getElementById('confirmBtn');
+    confirmBtn.addEventListener('click', async () => {
+      const snapshot = await onValue(pinsRef, () => {}, { onlyOnce: true });
+      snapshot.forEach(childSnap => {
+        update(ref(db, 'pins/' + childSnap.key), { confirmed: true });
+      });
+      alert("All pins confirmed!");
     });
 
   </script>
