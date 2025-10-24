@@ -14,7 +14,7 @@
 
 <style>
 html, body { height: 100%; margin: 0; padding: 0; }
-#map { height: 100%; width: 100%; }
+#map { height: 100%; width: 100%; z-index: 0; position: absolute; }
 .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 10px 15px rgba(0,0,0,0.2); }
 .leaflet-popup-content { color: #1f2937; }
 #search-form { cursor: default; }
@@ -23,10 +23,22 @@ html, body { height: 100%; margin: 0; padding: 0; }
 <body class="font-sans antialiased">
 
 <div class="relative h-screen w-screen">
+
+    <!-- Map -->
     <div id="map"></div>
 
+    <!-- Editor Mode Button -->
+    <div class="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-auto">
+        <div id="editor-status" class="bg-white/90 backdrop-blur-sm text-gray-800 font-semibold py-2 px-4 rounded-full shadow-lg hidden z-50">
+            Editor Mode Active
+        </div>
+        <button id="editor-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 z-50">
+            Enter Editor Mode
+        </button>
+    </div>
+
     <!-- Search Box -->
-    <div class="absolute top-4 right-4 z-20">
+    <div class="absolute top-4 right-4 z-50 pointer-events-auto">
         <form id="search-form" class="flex items-center bg-white rounded-full shadow-lg">
             <input id="search-input" type="text" placeholder="Search for a place..." class="py-2 px-4 rounded-l-full focus:outline-none w-48 sm:w-64 bg-transparent">
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 p-3 rounded-r-full transition-colors">
@@ -35,16 +47,6 @@ html, body { height: 100%; margin: 0; padding: 0; }
                 </svg>
             </button>
         </form>
-    </div>
-
-    <!-- Editor Mode Button -->
-    <div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
-        <div id="editor-status" class="bg-white/90 backdrop-blur-sm text-gray-800 font-semibold py-2 px-4 rounded-full shadow-lg hidden">
-            Editor Mode Active
-        </div>
-        <button id="editor-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300">
-            Enter Editor Mode
-        </button>
     </div>
 
     <!-- Pin Modal -->
@@ -106,6 +108,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
             </div>
         </div>
     </div>
+
 </div>
 
 <!-- Firebase + Map JS -->
@@ -130,53 +133,50 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-let map, isEditorMode = false, currentLatLng = null, markersOnMap = {}, confirmAction = null;
+let map, isEditorMode=false, currentLatLng=null, markersOnMap={}, confirmAction=null;
 
-// --- Map Setup with boundaries ---
-function initMap() {
-    const southWest = L.latLng(-85, -180);
-    const northEast = L.latLng(85, 180);
-    const bounds = L.latLngBounds(southWest, northEast);
+// --- Map Setup ---
+function initMap(){
+    const southWest = L.latLng(-85,-180);
+    const northEast = L.latLng(85,180);
+    const bounds = L.latLngBounds(southWest,northEast);
 
-    map = L.map('map', { maxBounds: bounds, maxBoundsViscosity: 1.0 }).setView([20,0],2);
+    map = L.map('map',{ maxBounds: bounds, maxBoundsViscosity:1.0 }).setView([20,0],2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
+        maxZoom:19,
+        attribution:'&copy; OpenStreetMap contributors'
     }).addTo(map);
-
     map.on('click', onMapClick);
 }
 
 // --- Firebase listener ---
-function listenForMarkers() {
+function listenForMarkers(){
     const markersRef = ref(db,'markers');
-    onValue(markersRef, snapshot => {
-        Object.values(markersOnMap).forEach(m => m.remove());
-        markersOnMap = {};
-        snapshot.forEach(child => {
+    onValue(markersRef, snapshot=>{
+        Object.values(markersOnMap).forEach(m=>m.remove());
+        markersOnMap={};
+        snapshot.forEach(child=>{
             const data = child.val();
-            if(data.lat && data.lng){
-                addMarkerToMap(data, child.key);
-            }
+            if(data.lat && data.lng) addMarkerToMap(data, child.key);
         });
     });
 }
 
-// --- Add marker to map ---
-function addMarkerToMap(data, id){
-    const marker = L.marker([data.lat, data.lng]).addTo(map);
-    let popup = `<div class="p-2"><h3 class="font-bold text-lg mb-1">${escapeHTML(data.name)}</h3><p>${escapeHTML(data.description)}</p>`;
-    if(isEditorMode) popup += `<button data-id="${id}" class="delete-btn mt-3 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full">Delete</button>`;
-    popup += '</div>';
+// --- Add marker ---
+function addMarkerToMap(data,id){
+    const marker = L.marker([data.lat,data.lng]).addTo(map);
+    let popup=`<div class="p-2"><h3 class="font-bold text-lg mb-1">${escapeHTML(data.name)}</h3><p>${escapeHTML(data.description)}</p>`;
+    if(isEditorMode) popup+=`<button data-id="${id}" class="delete-btn mt-3 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full">Delete</button>`;
+    popup+='</div>';
     marker.bindPopup(popup);
-    marker.on('click', e => map.flyTo(e.latlng, 15));
-    markersOnMap[id] = marker;
+    marker.on('click', e=>map.flyTo(e.latlng,15));
+    markersOnMap[id]=marker;
 }
 
-// --- Event handlers ---
+// --- Map Click ---
 function onMapClick(e){
     if(isEditorMode){
-        currentLatLng = e.latlng;
+        currentLatLng=e.latlng;
         document.getElementById('pin-form').reset();
         showModal('pin-modal');
     }
@@ -184,21 +184,21 @@ function onMapClick(e){
 
 // --- Escape HTML ---
 function escapeHTML(str){
-    const p = document.createElement('p');
-    p.textContent = str;
+    const p=document.createElement('p');
+    p.textContent=str;
     return p.innerHTML;
 }
 
 // --- Modals ---
 function showModal(id){
-    const modal = document.getElementById(id);
-    const content = document.getElementById(`${id}-content`);
+    const modal=document.getElementById(id);
+    const content=document.getElementById(`${id}-content`);
     modal.classList.remove('hidden');
     setTimeout(()=>content.classList.remove('scale-95','opacity-0'),10);
 }
 function hideModal(id){
-    const modal = document.getElementById(id);
-    const content = document.getElementById(`${id}-content`);
+    const modal=document.getElementById(id);
+    const content=document.getElementById(`${id}-content`);
     content.classList.add('scale-95','opacity-0');
     setTimeout(()=>modal.classList.add('hidden'),200);
 }
@@ -215,23 +215,23 @@ function toggleEditorMode(){
 }
 function handlePasswordSubmit(e){
     e.preventDefault();
-    const password = document.getElementById('password-input').value;
+    const password=document.getElementById('password-input').value;
     hideModal('password-modal');
-    if(password === EDITOR_PASSWORD){ 
+    if(password===EDITOR_PASSWORD){
         isEditorMode=true;
         showAlert('Editor mode activated.');
         updateUIAfterModeChange();
     } else if(password) showAlert('Incorrect password.');
 }
 function updateUIAfterModeChange(){
-    const status = document.getElementById('editor-status');
-    const btn = document.getElementById('editor-mode-btn');
+    const status=document.getElementById('editor-status');
+    const btn=document.getElementById('editor-mode-btn');
     status.classList.toggle('hidden',!isEditorMode);
     if(isEditorMode){
         btn.textContent='Exit Editor Mode';
         btn.classList.replace('bg-blue-600','bg-red-600');
         btn.classList.replace('hover:bg-blue-700','hover:bg-red-700');
-    } else {
+    } else{
         btn.textContent='Enter Editor Mode';
         btn.classList.replace('bg-red-600','bg-blue-600');
         btn.classList.replace('hover:bg-red-700','hover:bg-blue-700');
@@ -240,61 +240,59 @@ function updateUIAfterModeChange(){
 }
 
 // --- Pin Form ---
-async function handlePinFormSubmit(e){
+function handlePinFormSubmit(e){
     e.preventDefault();
     if(!currentLatLng) return;
-    const markersRef = ref(db,'markers');
-    const newMarkerRef = push(markersRef);
-    await newMarkerRef.set({
-        lat: currentLatLng.lat,
-        lng: currentLatLng.lng,
-        name: document.getElementById('pin-name').value,
-        description: document.getElementById('pin-desc').value
+    const name=document.getElementById('pin-name').value;
+    const desc=document.getElementById('pin-desc').value;
+    push(ref(db,'markers'),{
+        lat:currentLatLng.lat,
+        lng:currentLatLng.lng,
+        name,
+        description:desc
     });
     hideModal('pin-modal');
 }
 
-// --- Delete marker ---
+// --- Delete Marker ---
 function handleDeleteClick(e){
     if(e.target.classList.contains('delete-btn')){
-        const id = e.target.dataset.id;
-        showConfirm('Are you sure you want to delete this pin?', ()=>{
-            remove(ref(db,'markers/'+id)).catch(err=>console.error(err));
-        });
+        const id=e.target.dataset.id;
+        confirmAction=()=>remove(ref(db,'markers/'+id));
+        showConfirm('Are you sure you want to delete this pin?');
     }
 }
 
 // --- Search ---
 async function handleSearchSubmit(e){
     e.preventDefault();
-    const query = document.getElementById('search-input').value;
+    const query=document.getElementById('search-input').value;
     if(!query) return;
     try{
-        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-        const data = await resp.json();
+        const resp=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data=await resp.json();
         if(data.length>0){
-            const [lat,lon] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            const [lat,lon]=[parseFloat(data[0].lat),parseFloat(data[0].lon)];
             map.flyTo([lat,lon],13);
             L.popup().setLatLng([lat,lon]).setContent(`<b>Search Result:</b><br>${escapeHTML(data[0].display_name)}`).openOn(map);
         } else showAlert('Location not found');
     } catch(e){ console.error(e); showAlert('Search failed'); }
 }
 
-// --- Alert & Confirm ---
+// --- Alerts & Confirm ---
 function showAlert(msg){
-    document.getElementById('alert-message').textContent = msg;
+    document.getElementById('alert-message').textContent=msg;
     showModal('alert-modal');
 }
-function showConfirm(msg, action){
-    document.getElementById('confirm-message').textContent = msg;
-    confirmAction = action;
+function showConfirm(msg){
+    document.getElementById('confirm-message').textContent=msg;
     showModal('confirm-modal');
 }
 
 // --- Init ---
 async function main(){
-    try { await signInAnonymously(auth); } 
-    catch(e){ console.error(e); alert("Firebase auth failed"); }
+    try{ await signInAnonymously(auth); } 
+    catch(e){ console.error(e); showAlert("Firebase auth failed"); }
 
     initMap();
     listenForMarkers();
@@ -308,11 +306,12 @@ async function main(){
     document.getElementById('password-form').addEventListener('submit', handlePasswordSubmit);
     document.getElementById('cancel-password-btn').addEventListener('click', ()=>hideModal('password-modal'));
     document.getElementById('ok-alert-btn').addEventListener('click', ()=>hideModal('alert-modal'));
-    document.getElementById('cancel-confirm-btn').addEventListener('click', ()=>hideModal('confirm-modal'));
+    document.getElementById('cancel-confirm-btn').addEventListener('click', ()=>{
+        confirmAction=null; hideModal('confirm-modal');
+    });
     document.getElementById('confirm-action-btn').addEventListener('click', ()=>{
         if(typeof confirmAction==='function') confirmAction();
-        confirmAction=null;
-        hideModal('confirm-modal');
+        confirmAction=null; hideModal('confirm-modal');
     });
 }
 
